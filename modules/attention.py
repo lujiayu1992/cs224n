@@ -32,10 +32,31 @@ class CausalSelfAttention(nn.Module):
     return proj
 
   def attention(self, key, query, value, attention_mask):
-
+    
+    # (batch_size, num_attention_heads, sequence_length, sequence_length)
     ### YOUR CODE HERE
-    raise NotImplementedError
-
+    """_summary_
+    key, query, and value:
+    (batch_size, num_attention_heads, sequence_length, head_dimension)
+    
+    attention_mask:
+    (batch_size, 1, 1, sequence_length)
+    """
+    b,h,t,d = key.shape
+    key_transform = rearrange(key, 'b h t d -> b h d t')
+    product = query @ key_transform
+    product = product/d**.5 # (b h t t)
+    
+    
+    pad_mask = attention_mask.expand(b, 1, t, t)
+    casual_mask =  torch.triu(torch.ones(t, t, device=key.device, dtype=torch.bool), diagonal=1)[None, None, :, :]
+    product = product.masked_fill(casual_mask[:,:,:t,:t], float('-inf'))
+    product = product + pad_mask
+    
+    normalized_product = nn.functional.softmax(product, dim=-1)
+    attention = normalized_product @ value # (b h t t) @ (b h t d) => (b h t d)
+    proj = rearrange(attention, 'b h t d -> b t (h d)')
+    return proj
 
   def forward(self, hidden_states, attention_mask):
     """
