@@ -50,6 +50,7 @@ class ParaphraseGPT(nn.Module):
 
   def __init__(self, args):
     super().__init__()
+    self.config = args
     self.gpt = GPT2Model.from_pretrained(model=args.model_size, d=args.d, l=args.l, num_heads=args.num_heads)
     self.paraphrase_detection_head = nn.Linear(args.d, 2)  # Paraphrase detection has two outputs: 1 (yes) or 0 (no).
 
@@ -71,8 +72,13 @@ class ParaphraseGPT(nn.Module):
     """
 
     'Takes a batch of sentences and produces embeddings for them.'
-    ### YOUR CODE HERE
-    raise NotImplementedError
+    outputs = self.gpt(input_ids, attention_mask)
+    logits = self.paraphrase_detection_head(outputs['last_token'])
+    expanded_logits = torch.full((input_ids.shape[0], self.gpt.config.vocab_size), float('-inf'), device=self.config.device)
+    expanded_logits[:, 3919] = logits[:, 0]
+    expanded_logits[:, 8505] = logits[:, 1]
+    return expanded_logits
+    
 
 
 
@@ -106,6 +112,7 @@ def train(args):
                                    collate_fn=para_dev_data.collate_fn)
 
   args = add_arguments(args)
+  args.device = device
   model = ParaphraseGPT(args)
   model = model.to(device)
 
